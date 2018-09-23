@@ -1,4 +1,4 @@
-﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
 
@@ -24,6 +24,7 @@ using System.Net;
 using IdentityModel.Client;
 using FluentAssertions;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace IdentityServer4.IntegrationTests.Common
 {
@@ -59,7 +60,7 @@ namespace IdentityServer4.IntegrationTests.Common
         public HttpMessageHandler Handler { get; set; }
 
         public BrowserClient BrowserClient { get; set; }
-        public HttpClient Client { get; set; }
+        public HttpClient BackChannelClient { get; set; }
 
         public BackChannelMessageHandler BackChannelMessageHandler { get; set; } = new BackChannelMessageHandler();
 
@@ -70,7 +71,7 @@ namespace IdentityServer4.IntegrationTests.Common
 
         public Func<HttpContext, Task<bool>> OnFederatedSignout;
 
-        public void Initialize(string basePath = null)
+        public void Initialize(string basePath = null, bool enableLogging = false)
         {
             var builder = new WebHostBuilder();
             builder.ConfigureServices(ConfigureServices);
@@ -89,11 +90,16 @@ namespace IdentityServer4.IntegrationTests.Common
                 }
             });
 
+            if (enableLogging)
+            {
+                builder.ConfigureLogging((ctx, b) => b.AddConsole());
+            }
+
             Server = new TestServer(builder);
             Handler = Server.CreateHandler();
             
             BrowserClient = new BrowserClient(new BrowserHandler(Handler));
-            Client = new HttpClient(Handler);
+            BackChannelClient = new HttpClient(Handler);
         }
 
         public void ConfigureServices(IServiceCollection services)
@@ -190,7 +196,7 @@ namespace IdentityServer4.IntegrationTests.Common
                 var props = new AuthenticationProperties();
                 await ctx.SignInAsync(Subject, props);
                 Subject = null;
-                var url = ctx.Request.Query[this.Options.UserInteraction.LoginReturnUrlParameter].FirstOrDefault();
+                var url = ctx.Request.Query[Options.UserInteraction.LoginReturnUrlParameter].FirstOrDefault();
                 if (url != null)
                 {
                     ctx.Response.Redirect(url);
@@ -238,7 +244,7 @@ namespace IdentityServer4.IntegrationTests.Common
                 await interaction.GrantConsentAsync(ConsentRequest, ConsentResponse);
                 ConsentResponse = null;
 
-                var url = ctx.Request.Query[this.Options.UserInteraction.ConsentReturnUrlParameter].FirstOrDefault();
+                var url = ctx.Request.Query[Options.UserInteraction.ConsentReturnUrlParameter].FirstOrDefault();
                 if (url != null)
                 {
                     ctx.Response.Redirect(url);
@@ -275,9 +281,7 @@ namespace IdentityServer4.IntegrationTests.Common
 
         public async Task LoginAsync(string subject)
         {
-            var user = Users.Single(x => x.SubjectId == subject);
-            var name = user.Claims.Where(x => x.Type == "name").Select(x => x.Value).FirstOrDefault() ?? user.Username;
-            await LoginAsync(IdentityServerPrincipal.Create(subject, name));
+            await LoginAsync(new IdentityServerUser(subject).CreatePrincipal());
         }
 
         public void RemoveLoginCookie()
@@ -307,7 +311,7 @@ namespace IdentityServer4.IntegrationTests.Common
             string codeChallengeMethod = null,
             object extra = null)
         {
-            var url = new AuthorizeRequest(AuthorizeEndpoint).CreateAuthorizeUrl(
+            var url = new RequestUrl(AuthorizeEndpoint).CreateAuthorizeUrl(
                 clientId: clientId,
                 responseType: responseType,
                 scope: scope,

@@ -4,7 +4,7 @@ Introspection Endpoint
 The introspection endpoint is an implementation of `RFC 7662 <https://tools.ietf.org/html/rfc7662>`_.
 
 It can be used to validate reference tokens (or JWTs if the consumer does not have support for appropriate JWT or cryptographic libraries).
-The introspection endpoint requires authentication using a scope secret.
+The introspection endpoint requires authentication - since the client of an introspection endpoint is an API, you configure the secret on the ``ApiResource``.
 
 Example
 ^^^^^^^
@@ -43,8 +43,8 @@ You can programmatically access the introspection endpoint using the `IdentityMo
 
     var introspectionClient = new IntrospectionClient(
         doc.IntrospectionEndpoint,
-        "scope_name",
-        "scope_secret");
+        "api_name",
+        "api_secret");
 
     var response = await introspectionClient.SendAsync(
         new IntrospectionRequest { Token = token });

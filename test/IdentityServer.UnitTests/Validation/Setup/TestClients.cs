@@ -1,4 +1,4 @@
-﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
 
@@ -262,6 +262,8 @@ namespace IdentityServer4.UnitTests.Validation
                         AllowedGrantTypes = GrantTypes.ClientCredentials,
                         AllowedScopes = { "openid", "profile", "resource", "resource2" },
 
+                        AllowOfflineAccess = true,
+
                         AccessTokenType = AccessTokenType.Jwt
                     },
                     new Client
@@ -450,6 +452,7 @@ namespace IdentityServer4.UnitTests.Validation
                         },
 
                         AllowedGrantTypes = GrantTypes.Implicit,
+                        RedirectUris = { "https://notused" },
                         AllowedScopes = { "openid", "profile", "resource", "resource2" },
 
                         AccessTokenType = AccessTokenType.Reference
@@ -480,12 +483,14 @@ namespace IdentityServer4.UnitTests.Validation
                         ClientId = "client.implicit",
                         ClientName = "Implicit Client",
                         AllowedGrantTypes = GrantTypes.Implicit,
+                        RedirectUris = { "https://notused" },
                         AllowedScopes = { "openid", "profile", "resource", "resource2" }
                     },
                     new Client
                     {
                         ClientId = "implicit_and_client_creds",
                         AllowedGrantTypes = GrantTypes.ImplicitAndClientCredentials,
+                        RedirectUris = { "https://notused" },
                         AllowedScopes = {"api1"}
                     }
             };

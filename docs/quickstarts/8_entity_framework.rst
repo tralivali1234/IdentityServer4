@@ -5,6 +5,8 @@ Using EntityFramework Core for configuration and operational data
 IdentityServer is designed for extensibility, and one of the extensibility points is the storage mechanism used for data that IdentityServer needs.
 This quickstart shows how to configure IdentityServer to use EntityFramework (EF) as the storage mechanism for this data (rather than using the in-memory implementations we had been using up until now).
 
+.. Note:: In addition to manually configuring EF support, there is also an IdentityServer template to create a new project with EF support. Use ``dotnet new is4ef`` to create it. See `here <https://www.github.com/IdentityServer/IdentityServer4.Templates>`_ for more information.
+
 IdentityServer4.EntityFramework
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -34,10 +36,15 @@ If migrations are not your preference, then you can manage the schema changes in
 
 .. Note:: SQL scripts for SqlServer are maintained for the entities in `IdentityServer4.EntityFramework`. They are located `here <https://github.com/IdentityServer/IdentityServer4.EntityFramework/tree/dev/src/Host/Migrations/IdentityServer>`_.
 
+EF Tooling for Migrations
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
 In addition to tracking schema changes with EF migrations, we will also use it to create the initial schema in the database.
 This requires the use of the EF Core tooling (more details `here <https://docs.microsoft.com/en-us/ef/core/miscellaneous/cli/dotnet>`_).
 We will add those now, and unfortunately this must be done by hand-editing your `.csproj` file.
 To edit the `.csproj` by right-click the project and select "Edit projectname.csproj":
+
+.. Note:: Depending on how you created your initial project for the IdentityServer host, you might already have these tools configured in your `csproj` file. If they are, you can skip to the next section.
 
 .. image:: images/8_edit_csproj.png
 
@@ -60,7 +67,7 @@ It should look like this:
 Configuring the stores
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The next step is to replace the current calls to ``AddInMemoryClients``, ``AddInMemoryIdentityResources``, and ``AddInMemoryApiResources`` in the ``Configure`` method in `Startup.cs`.
+The next step is to replace the current calls to ``AddInMemoryClients``, ``AddInMemoryIdentityResources``, and ``AddInMemoryApiResources`` in the ``ConfigureServices`` method in `Startup.cs`.
 We will replace them with this code::
 
     const string connectionString = @"Data Source=(LocalDb)\MSSQLLocalDB;database=IdentityServer4.Quickstart.EntityFramework-2.0.0;trusted_connection=yes;";
@@ -126,6 +133,8 @@ It should look something like this:
 You should now see a `~/Data/Migrations/IdentityServer` folder in the project. 
 This contains the code for the newly created migrations.
 
+.. Note:: If your database project is a separate class library and you fixed the error 'Unable to create an object of type ‘<your-name>DbContext’. Add an implementation of ‘IDesignTimeDbContextFactory’ to the project, or see https://go.microsoft.com/fwlink/?linkid=851728 for additional patterns supported at design time.' by adding implementations of the IDesignTimeDbContextFactory, you will also need implementations of the factory for both the PersistedGrantDbContext as well as the ConfigurationDbContext. 
+
 Initialize the database
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -183,12 +192,15 @@ And then we can invoke this from the ``Configure`` method::
     }
 
 Now if you run the IdentityServer project, the database should be created and seeded with the quickstart configuration data.
-You should be able to use SqlServer Management Studio or Visual Studio to connect and inspect the data.
+You should be able to use SQL Server Management Studio or Visual Studio to connect and inspect the data.
 
 .. image:: images/8_database.png
 
+.. Note:: The above ``InitializeDatabase`` helper API is convenient to seed the database, but this approach is not ideal to leave in to execute each time the applicaion runs. Once your database is populated, consider removing the call to the API.
 
 Run the client applications
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You should now be able to run any of the existing client applications and sign-in, get tokens, and call the API -- all based upon the database configuration.
+
+.. Note:: The code as it stands in this section still relies upon Config.cs and its fictitious users Alice and Bob. If your user list is short and static, an adjusted version of Config.cs may suffice, however you may wish to manage a larger and more fluid user list dynamically within a database. ASP.NET Identity is one option to consider, and a sample implementation of this solution is listed among the quickstarts in the next section.

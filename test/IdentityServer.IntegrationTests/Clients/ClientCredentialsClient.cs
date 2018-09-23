@@ -1,4 +1,4 @@
-﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
 
@@ -24,7 +24,6 @@ namespace IdentityServer4.IntegrationTests.Clients
         private const string TokenEndpoint = "https://server/connect/token";
 
         private readonly HttpClient _client;
-        private readonly HttpMessageHandler _handler;
 
         public ClientCredentialsClient()
         {
@@ -32,20 +31,19 @@ namespace IdentityServer4.IntegrationTests.Clients
                 .UseStartup<Startup>();
             var server = new TestServer(builder);
 
-            _handler = server.CreateHandler();
             _client = server.CreateClient();
         }
 
         [Fact]
-        public async Task Invalid_Endpoint()
+        public async Task Invalid_endpoint_should_return_404()
         {
-            var client = new TokenClient(
-                TokenEndpoint + "invalid",
-                "client",
-                "secret",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync("api1");
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint + "invalid",
+                ClientId = "client",
+                ClientSecret = "secret",
+                Scope = "api1"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Http);
@@ -54,15 +52,15 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Valid_Client()
+        public async Task Valid_request_should_return_expected_payload()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client",
-                "secret",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync("api1");
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "secret",
+                Scope = "api1"
+            });
 
             response.IsError.Should().Be(false);
             response.ExpiresIn.Should().Be(3600);
@@ -86,15 +84,51 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Valid_Client_Multiple_Scopes()
+        public async Task Valid_request_with_confirmation_should_return_expected_payload()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client",
-                "secret",
-                innerHttpMessageHandler: _handler);
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client.cnf",
+                ClientSecret = "foo",
+                Scope = "api1"
+            });
 
-            var response = await client.RequestClientCredentialsAsync("api1 api2");
+            response.IsError.Should().Be(false);
+            response.ExpiresIn.Should().Be(3600);
+            response.TokenType.Should().Be("Bearer");
+            response.IdentityToken.Should().BeNull();
+            response.RefreshToken.Should().BeNull();
+
+            var payload = GetPayload(response);
+
+            payload.Count().Should().Be(7);
+            payload.Should().Contain("iss", "https://idsvr4");
+            payload.Should().Contain("client_id", "client.cnf");
+            
+
+            var audiences = ((JArray)payload["aud"]).Select(x => x.ToString());
+            audiences.Count().Should().Be(2);
+            audiences.Should().Contain("https://idsvr4/resources");
+            audiences.Should().Contain("api");
+
+            var scopes = payload["scope"] as JArray;
+            scopes.First().ToString().Should().Be("api1");
+
+            var cnf = payload["cnf"] as JObject;
+            cnf["x5t#S256"].ToString().Should().Be("foo");
+        }
+
+        [Fact]
+        public async Task Requesting_multiple_scopes_should_return_expected_payload()
+        {
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "secret",
+                Scope = "api1 api2"
+            });
 
             response.IsError.Should().Be(false);
             response.ExpiresIn.Should().Be(3600);
@@ -120,15 +154,14 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Valid_Client_with_Default_Scopes()
+        public async Task Request_with_no_explicit_scopes_should_return_expected_payload()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client",
-                "secret",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync();
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "secret"
+            });
 
             response.IsError.Should().Be(false);
             response.ExpiresIn.Should().Be(3600);
@@ -154,15 +187,14 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Valid_Client_without_Default_Scopes_Skipping_Scope_Parameter()
+        public async Task Client_without_default_scopes_skipping_scope_parameter_should_return_error()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client.no_default_scopes",
-                "secret",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync();
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client.no_default_scopes",
+                ClientSecret = "secret"
+            });
 
             response.IsError.Should().Be(true);
             response.ExpiresIn.Should().Be(0);
@@ -173,16 +205,17 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Valid_Client_PostBody()
+        public async Task Request_posting_client_secret_in_body_should_succeed()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client",
-                "secret",
-                _handler,
-                AuthenticationStyle.PostValues);
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "secret",
+                Scope = "api1",
 
-            var response = await client.RequestClientCredentialsAsync("api1");
+                ClientCredentialStyle = ClientCredentialStyle.PostBody
+            });
 
             response.IsError.Should().Be(false);
             response.ExpiresIn.Should().Be(3600);
@@ -205,31 +238,63 @@ namespace IdentityServer4.IntegrationTests.Clients
             scopes.First().ToString().Should().Be("api1");
         }
 
-        [Fact]
-        public async Task Invalid_Client_Secret()
-        {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client",
-                "invalid",
-                innerHttpMessageHandler: _handler);
 
-            var response = await client.RequestClientCredentialsAsync("api1");
+        [Fact]
+        public async Task Request_For_client_with_no_secret_and_basic_authentication_should_succeed()
+        {
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client.no_secret",
+                Scope = "api1"
+            });
+
+            response.IsError.Should().Be(false);
+            response.ExpiresIn.Should().Be(3600);
+            response.TokenType.Should().Be("Bearer");
+            response.IdentityToken.Should().BeNull();
+            response.RefreshToken.Should().BeNull();
+
+            var payload = GetPayload(response);
+
+            payload.Count().Should().Be(6);
+            payload.Should().Contain("iss", "https://idsvr4");
+            payload.Should().Contain("client_id", "client.no_secret");
+
+            var audiences = ((JArray)payload["aud"]).Select(x => x.ToString());
+            audiences.Count().Should().Be(2);
+            audiences.Should().Contain("https://idsvr4/resources");
+            audiences.Should().Contain("api");
+
+            var scopes = payload["scope"] as JArray;
+            scopes.First().ToString().Should().Be("api1");
+        }
+
+        [Fact]
+        public async Task Request_with_invalid_client_secret_should_fail()
+        {
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "invalid",
+                Scope = "api1"
+            });
 
             response.IsError.Should().Be(true);
             response.Error.Should().Be("invalid_client");
         }
 
         [Fact]
-        public async Task Invalid_Client()
+        public async Task Unknown_client_should_fail()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "invalid",
-                "secret",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync("api1");
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "invalid",
+                ClientSecret = "secret",
+                Scope = "api1"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);
@@ -238,14 +303,14 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task implicit_client_should_not_use_client_credential_grant()
+        public async Task Implicit_client_should_not_use_client_credential_grant()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "implicit",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync("api1");
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "implicit",
+                Scope = "api1"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);
@@ -254,14 +319,15 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task implicit_and_client_creds_client_should_not_use_client_credential_grant_without_secret()
+        public async Task Implicit_and_client_creds_client_should_not_use_client_credential_grant_without_secret()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "implicit_and_client_creds",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync("api1");
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "implicit_and_client_creds",
+                ClientSecret = "invalid",
+                Scope = "api1"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);
@@ -271,15 +337,15 @@ namespace IdentityServer4.IntegrationTests.Clients
 
 
         [Fact]
-        public async Task Unknown_Scope()
+        public async Task Requesting_unknown_scope_should_fail()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client",
-                "secret",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync("unknown");
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "secret",
+                Scope = "unknown"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);
@@ -288,15 +354,15 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Client_requesting_identity_scope_should_fail()
+        public async Task Client_explicitly_requesting_identity_scope_should_fail()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client.identityscopes",
-                "secret",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync("openid api1");
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client.identityscopes",
+                ClientSecret = "secret",
+                Scope = "openid api1"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);
@@ -305,15 +371,15 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task UnauthorizedScope()
+        public async Task Client_explicitly_requesting_offline_access_should_fail()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client",
-                "secret",
-                innerHttpMessageHandler: _handler);
-
-            var response = await client.RequestClientCredentialsAsync("api3");
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "secret",
+                Scope = "api1 offline_access"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);
@@ -322,15 +388,32 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Authorized_and_UnauthorizedScope()
+        public async Task Requesting_unauthorized_scope_should_fail()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "client",
-                "secret",
-                innerHttpMessageHandler: _handler);
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "secret",
+                Scope = "api3"
+            });
 
-            var response = await client.RequestClientCredentialsAsync("api1 api3");
+            response.IsError.Should().Be(true);
+            response.ErrorType.Should().Be(ResponseErrorType.Protocol);
+            response.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
+            response.Error.Should().Be("invalid_scope");
+        }
+
+        [Fact]
+        public async Task Requesting_authorized_and_unauthorized_scopes_should_fail()
+        {
+            var response = await _client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "client",
+                ClientSecret = "secret",
+                Scope = "api1 api3"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);

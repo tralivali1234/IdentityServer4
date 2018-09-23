@@ -21,10 +21,12 @@ The ``GrantTypes`` class can be used to pick from typical grant type combination
 
 You can also specify the grant types list manually::
 
-    Client.AllowedGrantTypes = new[] {
+    Client.AllowedGrantTypes = 
+    {
         GrantType.Hybrid, 
         GrantType.ClientCredentials,
-        "my_custom_grant_type" };
+        "my_custom_grant_type" 
+    };
 
 If you want to transmit access tokens via the browser channel, you also need to allow that explicitly on the client configuration::
 
@@ -100,7 +102,7 @@ Refresh tokens allow requesting new access tokens without user interaction. Ever
 (authenticated) back-channel call to IdentityServer. This allows checking if the refresh token is still valid, or has been revoked in the meantime.
 
 Refresh tokens are supported in hybrid, authorization code and resource owner password flows. 
-To request a refresh token, the client needs to include the ``offline_access`` scope in the token request (and must be authorized to for that scope). 
+To request a refresh token, the client needs to include the ``offline_access`` scope in the token request (and must be authorized to request for that scope). 
 
 Extension grants
 ================

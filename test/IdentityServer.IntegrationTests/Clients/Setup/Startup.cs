@@ -1,4 +1,4 @@
-﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
 
@@ -11,6 +11,8 @@ namespace IdentityServer4.IntegrationTests.Clients
 {
     public class Startup
     {
+        static public ICustomTokenRequestValidator CustomTokenRequestValidator { get; set; } 
+
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddAuthentication();
@@ -40,8 +42,15 @@ namespace IdentityServer4.IntegrationTests.Clients
             builder.AddExtensionGrantValidator<NoSubjectExtensionGrantValidator>();
             builder.AddExtensionGrantValidator<DynamicParameterExtensionGrantValidator>();
 
-            builder.AddSecretParser<ClientAssertionSecretParser>();
+            builder.AddSecretParser<JwtBearerClientAssertionSecretParser>();
             builder.AddSecretValidator<PrivateKeyJwtSecretValidator>();
+            builder.AddSecretValidator<ConfirmationSecretValidator>();
+
+            // add a custom token request validator if set
+            if (CustomTokenRequestValidator != null)
+            {
+                builder.Services.AddTransient(r => CustomTokenRequestValidator);
+            }
         }
 
         public void Configure(IApplicationBuilder app)

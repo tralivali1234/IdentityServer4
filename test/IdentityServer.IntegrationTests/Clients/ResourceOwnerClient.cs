@@ -1,4 +1,4 @@
-﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
 
@@ -24,7 +24,6 @@ namespace IdentityServer4.IntegrationTests.Clients
         private const string TokenEndpoint = "https://server/connect/token";
 
         private readonly HttpClient _client;
-        private readonly HttpMessageHandler _handler;
 
         public ResourceOwnerClient()
         {
@@ -32,20 +31,22 @@ namespace IdentityServer4.IntegrationTests.Clients
                 .UseStartup<Startup>();
             var server = new TestServer(builder);
 
-            _handler = server.CreateHandler();
             _client = server.CreateClient();
         }
 
         [Fact]
-        public async Task Valid_User()
+        public async Task Valid_user_should_succeed_with_expected_response_payload()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "roclient",
-                "secret",
-                innerHttpMessageHandler: _handler);
+            var response = await _client.RequestPasswordTokenAsync(new PasswordTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "roclient",
+                ClientSecret = "secret",
 
-            var response = await client.RequestResourceOwnerPasswordAsync("bob", "bob", "api1");
+                Scope = "api1",
+                UserName = "bob",
+                Password = "bob"
+            });
 
             response.IsError.Should().Be(false);
             response.ExpiresIn.Should().Be(3600);
@@ -76,15 +77,17 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Valid_User_with_Default_Scopes()
+        public async Task Request_with_no_explicit_scopes_should_return_allowed_scopes()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "roclient",
-                "secret",
-                innerHttpMessageHandler: _handler);
+            var response = await _client.RequestPasswordTokenAsync(new PasswordTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "roclient",
+                ClientSecret = "secret",
 
-            var response = await client.RequestResourceOwnerPasswordAsync("bob", "bob");
+                UserName = "bob",
+                Password = "bob"
+            });
 
             response.IsError.Should().Be(false);
             response.ExpiresIn.Should().Be(3600);
@@ -125,15 +128,18 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Valid_User_IdentityScopes()
+        public async Task Request_containing_identity_scopes_should_return_expected_payload()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "roclient",
-                "secret",
-                innerHttpMessageHandler: _handler);
+            var response = await _client.RequestPasswordTokenAsync(new PasswordTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "roclient",
+                ClientSecret = "secret",
 
-            var response = await client.RequestResourceOwnerPasswordAsync("bob", "bob", "openid email api1");
+                Scope = "openid email api1",
+                UserName = "bob",
+                Password = "bob"
+            });
 
             response.IsError.Should().Be(false);
             response.ExpiresIn.Should().Be(3600);
@@ -166,15 +172,18 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Valid_User_IdentityScopesRefreshToken()
+        public async Task Request_for_refresh_token_should_return_expected_payload()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "roclient",
-                "secret",
-                innerHttpMessageHandler: _handler);
+            var response = await _client.RequestPasswordTokenAsync(new PasswordTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "roclient",
+                ClientSecret = "secret",
 
-            var response = await client.RequestResourceOwnerPasswordAsync("bob", "bob", "openid email api1 offline_access");
+                Scope = "openid email api1 offline_access",
+                UserName = "bob",
+                Password = "bob"
+            });
 
             response.IsError.Should().Be(false);
             response.ExpiresIn.Should().Be(3600);
@@ -208,15 +217,18 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Unknown_User()
+        public async Task Unknown_user_should_fail()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "roclient",
-                "secret",
-                innerHttpMessageHandler: _handler);
+            var response = await _client.RequestPasswordTokenAsync(new PasswordTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "roclient",
+                ClientSecret = "secret",
 
-            var response = await client.RequestResourceOwnerPasswordAsync("unknown", "bob", "api1");
+                Scope = "api1",
+                UserName = "unknown",
+                Password = "bob"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);
@@ -225,15 +237,18 @@ namespace IdentityServer4.IntegrationTests.Clients
         }
 
         [Fact]
-        public async Task Invalid_Password()
+        public async Task User_with_invalid_password_should_fail()
         {
-            var client = new TokenClient(
-                TokenEndpoint,
-                "roclient",
-                "secret",
-                innerHttpMessageHandler: _handler);
+            var response = await _client.RequestPasswordTokenAsync(new PasswordTokenRequest
+            {
+                Address = TokenEndpoint,
+                ClientId = "roclient",
+                ClientSecret = "secret",
 
-            var response = await client.RequestResourceOwnerPasswordAsync("bob", "invalid", "api1");
+                Scope = "api1",
+                UserName = "bob",
+                Password = "invalid"
+            });
 
             response.IsError.Should().Be(true);
             response.ErrorType.Should().Be(ResponseErrorType.Protocol);

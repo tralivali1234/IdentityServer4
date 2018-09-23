@@ -13,7 +13,7 @@ Endpoints
 ^^^^^^^^^
 Allows enabling/disabling individual endpoints, e.g. token, authorize, userinfo etc.
 
-By default all endpoints are enabled, but you can lock down your server by disbling endpoint that you don't need.
+By default all endpoints are enabled, but you can lock down your server by disabling endpoint that you don't need.
 
 Discovery
 ^^^^^^^^^
@@ -34,6 +34,9 @@ Authentication
 
 * ``CheckSessionCookieName``
     The name of the cookie used for the check session endpoint.
+
+* ``RequireCspFrameSrcForSignout``
+    If set, will require frame-src CSP headers being emitting on the end session callback endpoint which renders iframes to clients for front-channel signout notification. Defaults to true.
 
 Events
 ^^^^^^
@@ -92,3 +95,13 @@ The underlying CORS implementation is provided from ASP.NET Core, and as such it
 * ``PreflightCacheDuration``
     `Nullable<TimeSpan>` indicating the value to be used in the preflight `Access-Control-Max-Age` response header.
     Defaults to `null` indicating no caching header is set on the response.
+
+CSP (Content Security Policy)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IdentityServer emits CSP headers for some responses, where appropriate.
+
+* ``Level``
+    The level of CSP to use. CSP Level 2 is used by default, but if older browsers must be supported then this be changed to ``CspLevel.One`` to accomodate them.
+
+* ``AddDeprecatedHeader``
+    Indicates if the older ``X-Content-Security-Policy`` CSP header should also be emitted (in addition to the standards-based header value). Defaults to true.

@@ -60,10 +60,10 @@ Add a new NPM package file to your project and name it `package.json`:
 
 .. image:: images/7_add_package_json.png
 
-In `package.json` add a ``devDependency`` to ``oidc-client``::
+In `package.json` add a ``dependency`` to ``oidc-client``::
 
-  "devDependencies": {
-    "oidc-client": "1.4.0"
+  "dependencies": {
+    "oidc-client": "1.4.1"
   }
 
 Once you have saved this file, Visual Studio should automatically restore these packages into a folder called `node_modules`:
@@ -187,6 +187,8 @@ Add this code to implement those three functions in our application::
     function logout() {
         mgr.signoutRedirect();
     }
+
+See: `Protecting an API using Client Credentials <http://docs.identityserver.io/en/release/quickstarts/1_client_credentials.html>` for information on how to create the api used in the code above.
 
 **callback.html**
 

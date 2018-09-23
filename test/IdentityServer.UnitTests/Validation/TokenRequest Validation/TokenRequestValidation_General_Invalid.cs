@@ -19,7 +19,7 @@ namespace IdentityServer4.UnitTests.Validation.TokenRequest
         private const string Category = "TokenRequest Validation - General - Invalid";
 
         private IClientStore _clients = new InMemoryClientStore(TestClients.Get());
-        private ClaimsPrincipal _subject = IdentityServerPrincipal.Create("bob", "Bob Loblaw");
+        private ClaimsPrincipal _subject = new IdentityServerUser("bob").CreatePrincipal();
 
         [Fact]
         [Trait("Category", Category)]
@@ -29,7 +29,7 @@ namespace IdentityServer4.UnitTests.Validation.TokenRequest
 
             Func<Task> act = () => validator.ValidateRequestAsync(null, null);
 
-            act.ShouldThrow<ArgumentNullException>();
+            act.Should().Throw<ArgumentNullException>();
         }
 
         [Fact]
@@ -45,7 +45,7 @@ namespace IdentityServer4.UnitTests.Validation.TokenRequest
 
             Func<Task> act = () => validator.ValidateRequestAsync(parameters, null);
 
-            act.ShouldThrow<ArgumentNullException>();
+            act.Should().Throw<ArgumentNullException>();
         }
 
         [Fact]
